@@ -155,3 +155,41 @@ df |>
   ggplot(aes(longitude, latitude, color = temp_grp)) +
   geom_point()
 ```
+
+Looks like the front is around 40.1N. Let's add this to our plot.
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
+  ggplot(aes(depth, temperature, color = lat_grp)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
+
+Do other measurements also show the front?
+
+What about oxygen and chlorophyl?
+
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
+  ggplot(aes(depth, chlorophyl, color = lat_grp)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
+
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
+  ggplot(aes(depth, oxygen, color = lat_grp)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
