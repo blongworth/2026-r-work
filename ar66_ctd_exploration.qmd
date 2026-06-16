@@ -189,7 +189,91 @@ df |>
   filter(depth < 100) |> 
   mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
   ggplot(aes(depth, oxygen, color = lat_grp)) +
+  geom_line(aes(group = cast)) +
   geom_point(alpha = 0.3) +
   scale_x_reverse() +
   coord_flip()
+```
+
+Is chlorophyl related to temp or the front?
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
+  ggplot(aes(temperature, chlorophyl, color = lat_grp)) +
+  geom_point()
+```
+
+Two observations: chlorophyl is pretty low and constant in the warmer,
+offshore water, and it looks like chlorphyl is inversely related to temperature
+in the colder, more northerly water.
+
+Can we plot a fit line for the onshore water?
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
+  ggplot(aes(temperature, chlorophyl, color = lat_grp)) +
+  geom_smooth() +
+  geom_point()
+```
+
+Let's make a TS plot! There's a great library for oceanographic stuff:
+`oce`.
+
+```{r}
+library(oce)
+
+ctd <- as.ctd(salinity = df$salinity,
+              temperature = df$temperature,
+              pressure = swPressure(df$depth, latitude = 40))
+
+plotTS(ctd,
+       inSitu = FALSE,      # potential temp (default)
+       nlevels = 8,         # number of isopycnals
+       col.rho = "gray40",  # color of density lines
+       drawFreezing = TRUE) # show freezing line
+
+```
+
+This is everything. Do the TS plots look different for the warm and cold masses?
+
+```{r}
+df_north <- df |> 
+  filter(latitude > 40.14)
+
+df_south <- df |> 
+  filter(latitude <= 40.14)
+```
+
+North (cold) water
+
+```{r}
+ctd_north <- as.ctd(salinity = df_north$salinity,
+              temperature = df_north$temperature,
+              pressure = swPressure(df_north$depth, latitude = 40))
+
+plotTS(ctd_north,
+       inSitu = FALSE,      # potential temp (default)
+       nlevels = 8,         # number of isopycnals
+       col.rho = "gray40",  # color of density lines
+       drawFreezing = TRUE) # show freezing line
+
+```
+
+South (warmer) water
+
+```{r}
+ctd_south <- as.ctd(salinity = df_south$salinity,
+              temperature = df_south$temperature,
+              pressure = swPressure(df_south$depth, latitude = 40))
+
+plotTS(ctd_south,
+       inSitu = FALSE,      # potential temp (default)
+       nlevels = 8,         # number of isopycnals
+       col.rho = "gray40",  # color of density lines
+       drawFreezing = TRUE) # show freezing line
+
 ```
