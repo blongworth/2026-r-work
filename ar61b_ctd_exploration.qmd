@@ -16,7 +16,7 @@ library(tidyverse)
 # Load data
 
 ```{r}
-df <- read_csv("data/ar61b_ctd_cast_data.csv")
+df <- read_csv("https://raw.githubusercontent.com/blongworth/whoi-ctd-data/main/data/ar61b_ctd_cast_data.csv")
 ```
 
 # Explore!
