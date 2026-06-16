@@ -1,0 +1,157 @@
+---
+title: "AR66 CTD profiles"
+format: html
+---
+
+Analyse and plot AR66 CTD data.
+CTD cast data are downloaded from the NES-LTER API
+and joined to bottle chlorophyl measurements
+
+# Setup libraries
+
+```{r}
+library(tidyverse)
+```
+
+# Load data
+
+```{r}
+df <- read_csv("data/ar61b_ctd_cast_data.csv")
+```
+
+# Explore!
+
+Check out the structure (also use data browser from environment or `view()`)
+
+```{r}
+str(df)
+```
+
+First few lines
+
+```{r}
+head(df)
+```
+
+Are the data types correct? Is this important for our analysis?
+
+How many stations are there? What are they called?
+
+```{r}
+unique(df$station)
+length(unique(df$station))
+```
+
+Which station had the most casts?
+
+```{r}
+# base R
+table(df$station)
+
+# dplyr
+df |> count(station) |> arrange(desc(n))
+```
+This is number of rows. How do we get number of casts?
+
+```{r}
+df |>
+  distinct(station, cast) |>   # ensure one row per station–cast combo
+  count(station, name = "n_casts") |> 
+  arrange(desc(n_casts))
+```
+
+# Station map
+
+```{r}
+df |> 
+  ggplot(aes(longitude, latitude, color = station)) +
+  geom_point()
+```
+
+# properties vs depth
+
+plot temp vs depth
+
+```{r}
+df |> 
+  ggplot(aes(depth, temperature)) +
+  geom_point()
+```
+
+```{r lm-fit, fig.alt="Scatter plot of life expectancy vs GDP per capita with a blue trend line summarising the relationship between variables, and gray shaded area indicating 95% confidence intervals for that trend line."}
+ggplot(data = df, mapping = aes(x = depth, y = temperature)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip() +
+  geom_smooth()
+```
+
+What's up with that difference in temp in the mixed layer?
+
+Let's zoom in.
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  ggplot(aes(depth, temperature)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
+
+What's different about these two populations?
+
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  ggplot(aes(depth, temperature, color = station)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
+Looks like it's grouped by station. Maybe it's separated by latitude. A front?
+
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  ggplot(aes(depth, temperature, color = latitude)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
+
+Still hard to see. What about making latitude groups?
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.4, "high", "low")) |> 
+  ggplot(aes(depth, temperature, color = lat_grp)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip()
+```
+
+Getting there, but there's still some southern stuff with high mixed layer temp.
+Let's try mapping the temp to see what's going on.
+
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  ggplot(aes(longitude, latitude, color = temperature)) +
+  geom_point()
+```
+
+Let's adjust colors to make things clear.
+
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(temp_grp = ifelse(temperature > 17, "high", "low")) |> 
+  ggplot(aes(longitude, latitude, color = temp_grp)) +
+  geom_point()
+```
