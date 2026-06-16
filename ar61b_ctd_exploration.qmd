@@ -78,7 +78,7 @@ df |>
   geom_point()
 ```
 
-```{r lm-fit, fig.alt="Scatter plot of life expectancy vs GDP per capita with a blue trend line summarising the relationship between variables, and gray shaded area indicating 95% confidence intervals for that trend line."}
+```{r lm-fit, fig.alt="Scatter plot of life expectancy vs GDP per capita with a blue trend line summarising the relationship between variables, and gray shaded area indicating 95% confidence intervals[...]
 ggplot(data = df, mapping = aes(x = depth, y = temperature)) +
   geom_point(alpha = 0.3) +
   scale_x_reverse() +
@@ -172,6 +172,30 @@ Do other measurements also show the front?
 
 What about oxygen and chlorophyl?
 
+## Comparing properties across the front using `pivot_longer()`
+
+Using `pivot_longer()` to compare multiple properties at once and eliminate code repetition:
+
+```{r}
+# Reshape to long format for easier comparison across properties
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "north (cold)", "south (warm)")) |>
+  pivot_longer(
+    cols = c(temperature, chlorophyl, oxygen),
+    names_to = "property",
+    values_to = "value"
+  ) |>
+  ggplot(aes(depth, value, color = lat_grp)) +
+  geom_point(alpha = 0.3) +
+  scale_x_reverse() +
+  coord_flip() +
+  facet_wrap(~property, scales = "free_x") +
+  labs(title = "Water properties across the front",
+       color = "Water mass")
+```
+
+## Original approach (individual plots)
 
 ```{r}
 df |> 
@@ -218,6 +242,31 @@ df |>
   ggplot(aes(temperature, chlorophyl, color = lat_grp)) +
   geom_smooth() +
   geom_point()
+```
+
+## Summary statistics across the front using `pivot_longer()` and `pivot_wider()`
+
+Create a summary table comparing mean and standard deviation of properties by water mass and depth:
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "north (cold)", "south (warm)"),
+         depth_bin = cut(depth, breaks = seq(0, 100, 20))) |>
+  pivot_longer(
+    cols = c(temperature, chlorophyl, oxygen, salinity),
+    names_to = "property",
+    values_to = "value"
+  ) |>
+  group_by(lat_grp, depth_bin, property) |>
+  summarise(mean = mean(value, na.rm = TRUE),
+            sd = sd(value, na.rm = TRUE),
+            .groups = "drop") |>
+  pivot_wider(
+    names_from = property,
+    values_from = c(mean, sd),
+    names_sep = "_"
+  )
 ```
 
 Let's make a TS plot! There's a great library for oceanographic stuff:
