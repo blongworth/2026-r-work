@@ -1,9 +1,9 @@
 ---
-title: "AR66 CTD profiles"
+title: "AR61b CTD profiles"
 format: html
 ---
 
-Analyse and plot AR66 CTD data.
+Analyse and plot AR61b CTD data.
 CTD cast data are downloaded from the NES-LTER API
 and joined to bottle chlorophyl measurements
 
@@ -277,3 +277,52 @@ plotTS(ctd_south,
        drawFreezing = TRUE) # show freezing line
 
 ```
+
+
+Does density structure across the front show differences?
+
+```{r}
+# Calculate sigma-theta and add to dataframe
+df <- df |>
+  mutate(
+    sigma_theta = swSigmaTheta(salinity, temperature, pressure = swPressure(depth, latitude = latitude))
+  )
+```
+
+
+```{r}
+# Plot sigma-theta vs depth
+df |> 
+  ggplot(aes(sigma_theta, depth)) +
+  geom_point(alpha = 0.3) +
+  scale_y_reverse() +
+  labs(x = "σ-θ (kg/m³)", y = "Depth (m)", 
+       title = "Potential Density Anomaly vs Depth")
+```
+
+
+```{r}
+# Color by station to see stratification differences
+df |> 
+  ggplot(aes(sigma_theta, depth, color = station)) +
+  geom_point(alpha = 0.3) +
+  scale_y_reverse() +
+  facet_wrap(~station) +
+  labs(x = "σ-θ (kg/m³)", y = "Depth (m)")
+```
+
+
+```{r}
+# Compare north/south front with density
+df |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "north (cold)", "south (warm)")) |>
+  mutate(
+    sigma_theta = swSigmaTheta(salinity, temperature, pressure = swPressure(depth, latitude = latitude))
+  ) |>
+  ggplot(aes(sigma_theta, depth, color = lat_grp)) +
+  geom_point(alpha = 0.3) +
+  scale_y_reverse() +
+  labs(x = "σ-θ (kg/m³)", y = "Depth (m)", color = "Water mass",
+       title = "Density structure across the front")
+```
+
