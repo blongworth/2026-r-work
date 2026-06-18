@@ -5,15 +5,44 @@ format: html
 
 Analyse and plot AR61b CTD data.
 CTD cast data are downloaded from the NES-LTER API
-and joined to bottle chlorophyl measurements
+and joined to bottle chlorophyll measurements. This could be done in R using 
+functions from dplyr and tidyr, but I've done this here in python:
+
+https://github.com/blongworth/whoi-ctd-data
 
 # Setup libraries
 
+We'll use functions from dplyr, tidyr, and ggplot. It's easy to load these
+and other packages at once using `library(tidyverse)`. Is this a good idea?
+It's easy, but makes it harder to know where functions come from.
+
+We'll also use the `oce` package later in the notebook, so we'll load it here.
+
+`oce` can be installed with `install.packages("oce")`.
+
+It's good practice to load all libraries
+at the beginning of the code.
+
 ```{r}
 library(tidyverse)
+library(oce)
 ```
 
+Note that `library(tidyverse)` tells us what packages we loaded,
+and more importantly, what name conflicts we've created.
+
+Think of package functions like any other variable or object (they are!).
+
+If we do `x <- 4` and then `x <- 2`, `x` is now 2
+because reassigning overwrites the previous value of `x`.
+
 # Load data
+
+We'll load the data directly from a url on github so we don't have to download it.
+`read_csv()` from the tidyverse `readr` package can do this directly.
+
+If we downloaded the data manually, 
+we'd put it within a `data` folder within our project.
 
 ```{r}
 df <- read_csv("https://raw.githubusercontent.com/blongworth/whoi-ctd-data/main/data/ar61b_ctd_cast_data.csv")
@@ -27,13 +56,25 @@ Check out the structure (also use data browser from environment or `view()`)
 str(df)
 ```
 
-First few lines
+First few lines...
 
 ```{r}
 head(df)
 ```
 
 Are the data types correct? Is this important for our analysis?
+
+* continuous variables like temp, sal, ox, and chl are good
+as floating point (double)
+* cast and niskin could be integers
+* cast, niskin, station could be factors
+* `niskin bottle` could be renamed as `niskin_bottle` or `niskin`
+to make it easier to use without backticks.
+
+Is any of this necessary? No. 
+Could it make the analysis easier and less error prone? Maybe.
+
+## Investigate stations
 
 How many stations are there? What are they called?
 
@@ -51,7 +92,11 @@ table(df$station)
 # dplyr
 df |> count(station) |> arrange(desc(n))
 ```
-This is number of rows. How do we get number of casts?
+
+This is number of rows in the data for each station.
+How do we get number of casts?
+
+`distinct()` will take only the first row for each station/cast combo.
 
 ```{r}
 df |>
@@ -62,15 +107,57 @@ df |>
 
 # Station map
 
+Let's see where these stations are! This just plots lat and lon of points.
+If we want a better map, there are a bunch of ggplot and other methods
+for producing nice maps with land, grids, bathymetry, etc.
+
 ```{r}
 df |> 
   ggplot(aes(longitude, latitude, color = station)) +
   geom_point()
 ```
 
+Let's at least make the lat and lon axes have the same interval...
+
+```{r}
+df |> 
+  ggplot(aes(longitude, latitude, color = station)) +
+  geom_point() +
+  coord_fixed()
+```
+
+Ugly, but makes more sense!
+
+A slightly fancier map...
+
+```{r}
+library(maps)   # for world map data
+
+world <- map_data("world")
+
+df |>
+  ggplot(aes(x = longitude, y = latitude, color = station)) +
+  geom_polygon(
+    data = world,
+    aes(x = long, y = lat, group = group),
+    inherit.aes = FALSE,
+    fill = "grey80",
+    color = "grey60",
+    linewidth = 0.2
+  ) +
+  geom_point(size = 2) +
+  coord_quickmap(xlim = c(-72, -69.5), ylim = c(39, 42)) +
+  theme_minimal() +
+  labs(x = NULL, y = NULL, color = "Station")
+
+```
+
+
 # properties vs depth
 
-plot temp vs depth
+Let's start checking out CTD profiles!
+
+## temp vs depth
 
 ```{r}
 df |> 
@@ -90,6 +177,8 @@ ggplot(data = df, mapping = aes(x = depth, y = temperature)) +
 What's up with that difference in temp in the mixed layer?
 
 Let's zoom in.
+To do this, we will use pipes and `dplyr::filter()` 
+to filter by depth before piping the filtered data to ggplot.
 
 ```{r}
 df |> 
@@ -100,7 +189,19 @@ df |>
   coord_flip()
 ```
 
-What's different about these two populations?
+We can also make a univariate plot to look at the difference in population.
+
+Maybe a histogram?
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  ggplot(aes(temperature)) +
+  geom_histogram()
+```
+
+
+What's different about these two populations? Is it separated by station?
 
 
 ```{r}
@@ -111,8 +212,8 @@ df |>
   scale_x_reverse() +
   coord_flip()
 ```
-Looks like it's grouped by station. Maybe it's separated by latitude. A front?
 
+Looks like it's grouped by station. Maybe it's separated by latitude. A front?
 
 ```{r}
 df |> 
@@ -123,7 +224,11 @@ df |>
   coord_flip()
 ```
 
-Still hard to see. What about making latitude groups?
+Still hard to see. What about making latitude groups? 
+
+We'll make a column splitting data into high and low latitudes
+using `dplyr::mutate()` and ifelse to conditionally assign 
+high and low based on the value of the latitude column
 
 ```{r}
 df |> 
@@ -138,7 +243,6 @@ df |>
 Getting there, but there's still some southern stuff with high mixed layer temp.
 Let's try mapping the temp to see what's going on.
 
-
 ```{r}
 df |> 
   filter(depth < 100) |> 
@@ -146,8 +250,8 @@ df |>
   geom_point()
 ```
 
-Let's adjust colors to make things clear.
-
+Adjust colors to make things clear.
+We're using mutate and ifelse again to make temp into a TRUE/FALSE
 
 ```{r}
 df |> 
@@ -158,6 +262,8 @@ df |>
 ```
 
 Looks like the front is around 40.1N. Let's add this to our plot.
+We can iterate on the exact latitude of the front until 
+we think we've found the right value.
 
 ```{r}
 df |> 
@@ -169,17 +275,28 @@ df |>
   coord_flip()
 ```
 
-Do other measurements also show the front?
-
-What about oxygen and chlorophyl?
-
-## individual plots
+Now that we have the groups well separated, 
+we could compare the groups using a boxplot.
 
 ```{r}
 df |> 
   filter(depth < 100) |> 
   mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
-  ggplot(aes(depth, chlorophyl, color = lat_grp)) +
+  ggplot(aes(lat_grp, temperature)) +
+  geom_boxplot() 
+```
+
+## individual plots
+
+Do other measurements also show the front?
+
+What about oxygen and chlorophyll?
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
+  ggplot(aes(depth, chlorophyll, color = lat_grp)) +
   geom_point(alpha = 0.3) +
   scale_x_reverse() +
   coord_flip()
@@ -197,7 +314,7 @@ df |>
   coord_flip()
 ```
 
-## Comparing properties across the front using `pivot_longer()`
+### Comparing properties across the front using `pivot_longer()`
 
 Using `pivot_longer()` to compare multiple properties at once and eliminate code repetition:
 
@@ -207,7 +324,7 @@ df |>
   filter(depth < 100) |> 
   mutate(lat_grp = ifelse(latitude > 40.14, "north (cold)", "south (warm)")) |>
   pivot_longer(
-    cols = c(temperature, chlorophyl, oxygen),
+    cols = c(temperature, chlorophyll, oxygen),
     names_to = "property",
     values_to = "value"
   ) |>
@@ -220,18 +337,18 @@ df |>
        color = "Water mass")
 ```
 
-Is chlorophyl related to temp or the front?
+Is chlorophyll related to temp or the front?
 
 ```{r}
 df |> 
   filter(depth < 100) |> 
   mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
-  ggplot(aes(temperature, chlorophyl, color = lat_grp)) +
+  ggplot(aes(temperature, chlorophyll, color = lat_grp)) +
   geom_point()
 ```
 
-Two observations: chlorophyl is pretty low and constant in the warmer,
-offshore water, and it looks like chlorphyl is inversely related to temperature
+Two observations: chlorophyll is pretty low and constant in the warmer,
+offshore water, and it looks like chlorophyll is inversely related to temperature
 in the colder, more northerly water.
 
 Can we plot a fit line for the onshore water?
@@ -240,7 +357,7 @@ Can we plot a fit line for the onshore water?
 df |> 
   filter(depth < 100) |> 
   mutate(lat_grp = ifelse(latitude > 40.14, "high", "low")) |> 
-  ggplot(aes(temperature, chlorophyl, color = lat_grp)) +
+  ggplot(aes(temperature, chlorophyll, color = lat_grp)) +
   geom_smooth() +
   geom_point()
 ```
@@ -255,7 +372,7 @@ df |>
   mutate(lat_grp = ifelse(latitude > 40.14, "north (cold)", "south (warm)"),
          depth_bin = cut(depth, breaks = seq(0, 100, 50))) |>
   pivot_longer(
-    cols = c(temperature, chlorophyl, oxygen, salinity),
+    cols = c(temperature, chlorophyll, oxygen, salinity),
     names_to = "property",
     values_to = "value"
   ) |>
@@ -271,7 +388,11 @@ df |>
 ```
 
 Let's make a TS plot! There's a great library for oceanographic stuff:
-`oce`.
+`oce`. We can install it using `install.packages("oce").
+
+oce is pretty picky about data formatting, so we'll have to make our columns
+into an oce ctd object using `as.ctd()`.
+We're also using `oce::swPressure() to convert depth to pressure.
 
 ```{r}
 library(oce)
@@ -328,8 +449,10 @@ plotTS(ctd_south,
 
 ```
 
-
 Does density structure across the front show differences?
+We'll calcuate sigma theta and add it to the original df.
+Should we add to the original df or to a new dataframe? 
+How might reassigning df cause issues?
 
 ```{r}
 # Calculate sigma-theta and add to dataframe
@@ -339,6 +462,7 @@ df <- df |>
   )
 ```
 
+Let's plot it and add some nice labels.
 
 ```{r}
 # Plot sigma-theta vs depth
@@ -350,6 +474,7 @@ df |>
        title = "Potential Density Anomaly vs Depth")
 ```
 
+Is stratification different at different stations?
 
 ```{r}
 # Color by station to see stratification differences
@@ -361,6 +486,7 @@ df |>
   labs(x = "σ-θ (kg/m³)", y = "Depth (m)")
 ```
 
+Is stratification different across the front?
 
 ```{r}
 # Compare north/south front with density
@@ -376,3 +502,13 @@ df |>
        title = "Density structure across the front")
 ```
 
+# For more info
+
+Check out the NES-LTER API!
+
+https://nes-lter-api.whoi.edu/
+
+There's also a great R notebook demonstrating getting data directly from the API
+and making more cool plots:
+
+https://colab.research.google.com/drive/1F9m-WSOyB3LA9IqvWDKwhQVPrBG_c5Sz?usp=sharing
