@@ -68,6 +68,7 @@ Are the data types correct? Is this important for our analysis?
 as floating point (double)
 * cast and niskin could be integers
 * cast, niskin, station could be factors
+* station will be in alphabetical order
 * `niskin bottle` could be renamed as `niskin_bottle` or `niskin`
 to make it easier to use without backticks.
 
@@ -115,6 +116,17 @@ for producing nice maps with land, grids, bathymetry, etc.
 df |> 
   ggplot(aes(longitude, latitude, color = station)) +
   geom_point()
+```
+
+Can we fix the station order?
+
+```{r}
+lvl_order <- c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L7.5",
+               "L8", "L9", "u9a", "u9b", "d9a", "L9.5", "L10", 
+               "L11", "u11a", "L12", "L13")
+
+# make an ordered factor
+df$station <- factor(df$station, levels = lvl_order, ordered = TRUE)
 ```
 
 Let's at least make the lat and lon axes have the same interval...
@@ -248,6 +260,16 @@ df |>
   filter(depth < 100) |> 
   ggplot(aes(longitude, latitude, color = temperature)) +
   geom_point()
+```
+
+Let's change to a better temperature scale
+
+```{r}
+df |> 
+  filter(depth < 100) |> 
+  ggplot(aes(longitude, latitude, color = temperature)) +
+  geom_point() +
+  scale_color_viridis_c(option = "inferno")
 ```
 
 Adjust colors to make things clear.
